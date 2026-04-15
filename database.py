@@ -2,29 +2,24 @@ import sqlite3
 from datetime import datetime
 from security import hash_password
 
-DB_NAME = "saas.db"
+DB_NAME = "users.db"
 
-def init_db():
+def init_users():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
-    # USERS
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
-        role TEXT,
-        plan TEXT,
-        usage INTEGER DEFAULT 0
+        plan TEXT DEFAULT 'free'
     )
     """)
 
-    # CLIENTS
     c.execute("""
     CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user TEXT,
         age INTEGER,
         revenu REAL,
         couverture REAL,
@@ -33,15 +28,6 @@ def init_db():
         date TEXT
     )
     """)
-
-    # ADMIN AUTO
-    try:
-        c.execute(
-            "INSERT INTO users (username, password, role, plan) VALUES (?, ?, ?, ?)",
-            ("admin", hash_password("admin123"), "admin", "enterprise")
-        )
-    except:
-        pass
 
     conn.commit()
     conn.close()
@@ -52,10 +38,9 @@ def create_user(username, password):
     c = conn.cursor()
 
     try:
-        c.execute(
-            "INSERT INTO users (username, password, role, plan) VALUES (?, ?, ?, ?)",
-            (username, hash_password(password), "client", "free")
-        )
+        hashed = hash_password(password)
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)",
+                  (username, hashed))
         conn.commit()
         return True
     except:
@@ -75,23 +60,14 @@ def get_user(username):
     return user
 
 
-def increment_usage(username):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    c.execute("UPDATE users SET usage = usage + 1 WHERE username=?", (username,))
-    conn.commit()
-    conn.close()
-
-
-def save_client(user, age, revenu, couverture, risque, prime):
+def save_client(age, revenu, couverture, risque, prime):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
     c.execute("""
-    INSERT INTO clients (user, age, revenu, couverture, risque, prime, date)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (user, age, revenu, couverture, risque, prime, datetime.now()))
+    INSERT INTO clients (age, revenu, couverture, risque, prime, date)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (age, revenu, couverture, risque, prime, datetime.now()))
 
     conn.commit()
     conn.close()
@@ -101,7 +77,7 @@ def get_clients():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
-    c.execute("SELECT * FROM clients")
+    c.execute("SELECT * FROM clients ORDER BY id DESC")
     data = c.fetchall()
 
     conn.close()

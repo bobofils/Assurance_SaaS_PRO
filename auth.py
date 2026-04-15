@@ -4,32 +4,39 @@ from security import check_password
 
 def auth_page():
 
-    st.title("🔐 Authentification SaaS")
+    st.title("🔐 Auth SaaS PRO")
 
     menu = st.radio("Menu", ["Login", "Signup"])
 
     if menu == "Signup":
-        user = st.text_input("Utilisateur")
-        pwd = st.text_input("Mot de passe", type="password")
+
+        username = st.text_input("Utilisateur", key="su_user")
+        password = st.text_input("Mot de passe", type="password", key="su_pass")
 
         if st.button("Créer compte"):
-            if create_user(user, pwd):
+
+            if username == "" or password == "":
+                st.warning("Champs obligatoires")
+                return
+
+            if create_user(username, password):
                 st.success("Compte créé ✅")
             else:
-                st.error("Utilisateur existe ❌")
+                st.error("Utilisateur déjà existant ❌")
 
     else:
-        user = st.text_input("Utilisateur")
-        pwd = st.text_input("Mot de passe", type="password")
 
-        if st.button("Login"):
-            data = get_user(user)
+        username = st.text_input("Utilisateur", key="li_user")
+        password = st.text_input("Mot de passe", type="password", key="li_pass")
 
-            if data and check_password(pwd, data[2]):
-                st.session_state["user"] = user
-                st.session_state["plan"] = data[4]
-                st.session_state["usage"] = data[5]
-                st.success("Connexion OK ✅")
+        if st.button("Se connecter"):
+
+            user = get_user(username)
+
+            if user and check_password(password, user[2]):
+                st.session_state["user"] = username
+                st.session_state["plan"] = user[3]
+                st.success("Connexion réussie ✅")
                 st.rerun()
             else:
-                st.error("Erreur login ❌")
+                st.error("Login incorrect ❌")

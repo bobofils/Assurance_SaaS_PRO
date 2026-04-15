@@ -1,16 +1,18 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
+import io
+from fpdf import FPDF
 
 from auth import auth_page
-from database import init_db, save_client, increment_usage
-from billing import check_access
+from database import init_users, save_client, get_clients
 from utils import load_model
 from admin import admin_dashboard
 
-st.set_page_config(layout="wide")
-
-init_db()
+init_users()
 model = load_model()
+
+st.set_page_config(page_title="Assurance SaaS PRO", layout="wide")
 
 if "user" not in st.session_state:
     auth_page()
@@ -18,40 +20,47 @@ if "user" not in st.session_state:
 
 st.title("🛡️ Assurance SaaS PRO")
 
-user = st.session_state["user"]
-plan = st.session_state["plan"]
-usage = st.session_state["usage"]
-
-st.sidebar.write(f"👤 {user}")
-st.sidebar.write(f"📦 Plan: {plan}")
+st.sidebar.success(f"User: {st.session_state['user']}")
+st.sidebar.info(f"Plan: {st.session_state.get('plan','free')}")
 
 if st.sidebar.button("Logout"):
-    st.session_state.clear()
+    del st.session_state["user"]
     st.rerun()
 
-# LIMIT
-if not check_access(plan, usage):
-    st.error("🚫 Limite gratuite atteinte. Passe au plan PRO.")
-    st.stop()
+# =====================
+# FORMULAIRE
+# =====================
+st.header("👤 Client")
 
-# FORM
-age = st.slider("Âge", 18, 80)
-revenu = st.number_input("Revenu", 0, 10000000)
-couverture = st.number_input("Couverture", 0, 50000000)
+age = st.slider("Âge", 18, 80, 30)
+revenu = st.number_input("Revenu", 0, 10000000, 300000)
+couverture = st.number_input("Couverture", 0, 50000000, 1000000)
+anciennete = st.number_input("Ancienneté", 0, 40, 2)
+charges = st.number_input("Charges", 0, 5000000, 0)
+credit = st.number_input("Crédit", 0, 5000000, 0)
+
+revenu_total = revenu
 
 if st.button("Analyser"):
-    X = np.array([[age, revenu, couverture]])
+
+    X = np.array([[age, revenu_total, couverture, anciennete, charges, credit]])
+
+    pred = model.predict(X)[0]
     proba = model.predict_proba(X)[0][1]
-    risk = (1 - proba) * 100
 
-    prime = couverture * 0.05
+    risk = round((1 - proba) * 100, 2)
 
-    st.metric("Risque", f"{risk:.2f}%")
-    st.success(f"Prime: {prime:,.0f} FCFA")
+    coef = 0.02 if risk < 30 else 0.05 if risk < 60 else 0.1
+    prime = couverture * coef
 
-    save_client(user, age, revenu, couverture, risk, prime)
-    increment_usage(user)
+    st.metric("Risque", f"{risk}%")
 
+    st.success(f"Prime: {prime:,.0f}")
+
+    save_client(age, revenu_total, couverture, risk, prime)
+
+# =====================
 # ADMIN
-if user == "admin":
-    admin_dashboard()
+# =====================
+st.header("📊 Dashboard")
+admin_dashboard()
